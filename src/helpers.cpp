@@ -2,6 +2,9 @@
 #include <fstream>
 #include <algorithm>
 
+#include <pcl/common/centroid.h>
+#include <pcl/common/transforms.h>
+
 namespace {
 static bool hasField(const pcl::PCLPointCloud2 &cloud, const std::string &field_name) {
   return std::any_of(
@@ -84,4 +87,20 @@ PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob) {
     pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
     return cloud;
   }
+}
+
+void shiftCloudToCentroid(PointCloudVariantPtr &cloud) {
+  std::visit(
+      [&](auto &&cloudPtr) {
+        if (!cloudPtr || cloudPtr->points.empty()) return;
+
+        Eigen::Vector4f centroid{};
+        pcl::compute3DCentroid(*cloudPtr, centroid);
+
+        Eigen::Affine3f transform{ Eigen::Affine3f::Identity() };
+        transform.translation() = -centroid.head<3>();
+
+        pcl::transformPointCloud(*cloudPtr, *cloudPtr, transform);
+      },
+      cloud);
 }

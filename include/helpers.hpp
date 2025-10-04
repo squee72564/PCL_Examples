@@ -20,6 +20,8 @@ int loadPCDFileManual(const std::string &file_name,
 
 PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob);
 
+void shiftCloudToCentroid(PointCloudVariantPtr &cloud);
+
 template <typename CloudT>
 void addToPointCloudVisualizer(
     typename CloudT::Ptr &pointCloud,

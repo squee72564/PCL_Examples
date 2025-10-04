@@ -24,8 +24,6 @@
 void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
                         pcl::visualization::PCLVisualizer::Ptr& cloudViewer);
 
-void shiftCloudToLocalFrame(PointCloudVariantPtr &cloud);
-
 PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud);
 
 int main(int argc, char *argv[]) {
@@ -66,7 +64,7 @@ int main(int argc, char *argv[]) {
         << "Converting PCLPointCloud2 to actual type PointCloud<PointT>\n";
     PointCloudVariantPtr pointCloudPtrTemp = loadCloud(pointCloudBlob);
 
-    shiftCloudToLocalFrame(pointCloudPtrTemp);
+    shiftCloudToCentroid(pointCloudPtrTemp);
     pointCloudPtr = std::move(downsampleWithVoxelGrid(pointCloudPtrTemp));
   }
 
@@ -135,26 +133,6 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
         std::cout << "Added Point Clouds\n";
       },
       pointCloudPtr);
-}
-
-void shiftCloudToLocalFrame(PointCloudVariantPtr &cloud) {
-  std::visit(
-      [&](auto &&cloudPtr) {
-        using CloudT = std::decay_t<decltype(*cloudPtr)>;
-
-        Eigen::Vector3f ref{};
-
-        ref.x() = cloudPtr->points[0].x;
-        ref.y() = cloudPtr->points[0].y;
-        ref.z() = cloudPtr->points[0].z;
-
-        for (auto &pt : cloudPtr->points) {
-          pt.x -= ref.x();
-          pt.y -= ref.y();
-          pt.z -= ref.z();
-        }
-      },
-      cloud);
 }
 
 PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud) {
