@@ -62,19 +62,24 @@ int loadPCDFileManual(const std::string &file_name,
   }
 }
 PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob) {
+  std::cout << "Loading PointCloud with type: ";
   if (hasField(pointCloudBlob, "rgba")) {
+    std::cout << "POINTXYZRGBA\n";
     auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZRGBA>>();
     pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
     return cloud;
   } else if (hasField(pointCloudBlob, "rgb")) {
+    std::cout << "POINTXYZRGB\n";
     auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
     pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
     return cloud;
   } else if (hasField(pointCloudBlob, "intensity")) {
+    std::cout << "POINTXYZI\n";
     auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
     pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
     return cloud;
   } else {
+    std::cout << "POINTXYZ\n";
     auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
     pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
     return cloud;
