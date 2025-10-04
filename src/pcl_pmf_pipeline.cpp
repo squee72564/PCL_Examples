@@ -21,12 +21,6 @@
 #include <pcl/segmentation/progressive_morphological_filter.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
-template <typename CloudT>
-void addToPointCloudVisualizer(
-    typename CloudT::Ptr &pointCloud,
-    pcl::visualization::PCLVisualizer::Ptr cloudViewer,
-    const std::string &cloudName);
-
 void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
                         pcl::visualization::PCLVisualizer::Ptr& cloudViewer);
 
