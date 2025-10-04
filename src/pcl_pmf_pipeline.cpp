@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     pointCloudPtr = std::move(downsampleWithVoxelGrid(pointCloudPtrTemp));
   }
 
-  auto &&[terrainCloud, obstacleCloud] =
+  auto [terrainCloud, obstacleCloud] =
       extract_inlier_and_outlier_pmf(pointCloudPtr);
 
   addToPointCloudVisualizer(terrainCloud, cloudViewer, "terrain",
