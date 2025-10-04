@@ -1,17 +1,20 @@
 #include <cstdlib>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/PointIndices.h>
+#include <pcl/impl/point_types.hpp>
 #include <thread>
 #include <type_traits>
 #include <variant>
 
 #include <fmt/format.h>
 
+#include "helper_types.hpp"
 #include "helpers.hpp"
 
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/common.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/memory.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -19,11 +22,78 @@
 #include <pcl/visualization/pcl_visualizer.h>
 
 void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
+                        pcl::visualization::PCLVisualizer::Ptr cloudViewer);
+
+void shiftCloudToLocalFrame(PointCloudVariantPtr &cloud);
+
+PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud);
+
+int main(int argc, char *argv[]) {
+  if (argc < 2) {
+    std::cerr << fmt::format("Usage: {} <pcd file>\n", argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  pcl::PCLPointCloud2 pointCloudBlob{};
+  Eigen::Vector4f origin{};
+  Eigen::Quaternionf orientation{};
+
+  std::cout << "Loading point cloud from PCD file.\n";
+  if (loadPCDFileManual(argv[1], pointCloudBlob, origin, orientation) != 0) {
+    std::cerr << "Error: Failed to load PCD file. Exiting program.\n";
+    return EXIT_FAILURE;
+  }
+
+  std::cout << fmt::format("-- Original PCLPointCloud2 data size: {}\n",
+                           pointCloudBlob.data.size());
+
+  for (const auto &field : pointCloudBlob.fields) {
+    std::cout << fmt::format("-- Field: {} (offset {}, type {}, count {})\n",
+                             field.name, field.offset, field.datatype,
+                             field.count);
+  }
+
+  pcl::visualization::PCLVisualizer::Ptr cloudViewer =
+      pcl::make_shared<pcl::visualization::PCLVisualizer>(
+          "PCD File - Point Cloud Visualization");
+
+  // variant to hold all PointT types for actual point cloud
+  // Right now I load into a temporary cloud and then
+  PointCloudVariantPtr pointCloudPtr{};
+
+  {
+    std::cout << "Converting PCLPointCloud2 to actual type PointCloud<PointT>\n";
+    PointCloudVariantPtr pointCloudPtrTemp = loadCloud(pointCloudBlob);
+
+    shiftCloudToLocalFrame(pointCloudPtrTemp);
+    pointCloudPtr = std::move(downsampleWithVoxelGrid(pointCloudPtrTemp));
+  }
+
+  runPMFAndVisualize(pointCloudPtr, cloudViewer);
+
+  std::cout << "Resetting camera\n";
+  cloudViewer->resetCamera();
+
+  std::cout << "Entering visualization loop\n";
+  // Start visualization loop
+  while (!cloudViewer->wasStopped()) {
+    cloudViewer->spinOnce(100);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+
+  return EXIT_SUCCESS;
+}
+
+void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
                         pcl::visualization::PCLVisualizer::Ptr cloudViewer) {
   std::visit(
       [&](auto cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
-        using PointT = point_type_of_t<CloudT>;
+        using PointT = typename CloudT::PointType;
+
+        std::cout
+            << "Running PMF and adding inlier / outlier point clouds to visualizer\n"
+            << fmt::format("--Total points in cloud: {}\n", cloudPtr->size());
 
         auto pmf =
             pcl::make_shared<pcl::ProgressiveMorphologicalFilter<PointT>>();
@@ -60,7 +130,6 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
                                  CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
                              std::is_same_v<
                                  CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
-          using PointT = typename CloudT::PointType;
           auto handler =
               pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
                   inlierCloud);
@@ -86,7 +155,6 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
                                  CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
                              std::is_same_v<
                                  CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
-          using PointT = typename CloudT::PointType;
           auto handler =
               pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
                   outlierCloud);
@@ -103,49 +171,48 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
       pointCloudPtr);
 }
 
-int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    std::cerr << fmt::format("Usage: {} <pcd file>\n", argv[0]);
-    return EXIT_FAILURE;
-  }
+void shiftCloudToLocalFrame(PointCloudVariantPtr &cloud) {
+  std::visit(
+      [&](auto &&cloudPtr) {
+        using CloudT = std::decay_t<decltype(*cloudPtr)>;
 
-  pcl::PCLPointCloud2 pointCloudBlob;
-  Eigen::Vector4f origin{};
-  Eigen::Quaternionf orientation{};
+        Eigen::Vector3f ref{};
 
-  std::cout << "Loading point cloud from PCD file.\n";
-  if (loadPCDFileManual(argv[1], pointCloudBlob, origin, orientation) != 0) {
-    std::cerr << "Error: Failed to load PCD file. Exiting program.\n";
-    return EXIT_FAILURE;
-  }
+        ref.x() = cloudPtr->points[0].x;
+        ref.y() = cloudPtr->points[0].y;
+        ref.z() = cloudPtr->points[0].z;
 
-  std::cout << fmt::format("PCLPointCloud2 data size: {}\n",
-                           pointCloudBlob.data.size());
+        for (auto &pt : cloudPtr->points) {
+          pt.x -= ref.x();
+          pt.y -= ref.y();
+          pt.z -= ref.z();
+        }
+      },
+      cloud);
+}
 
-  for (const auto &field : pointCloudBlob.fields) {
-    std::cout << fmt::format("Field: {} (offset {}, type {}, count {})\n",
-                             field.name, field.offset, field.datatype,
-                             field.count);
-  }
+PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud) {
+  return std::visit(
+      [&](auto &&cloudPtr) {
+        using CloudT = std::decay_t<decltype(*cloudPtr)>;
+        using PointT = typename CloudT::PointType;
 
-  pcl::visualization::PCLVisualizer::Ptr cloudViewer =
-      pcl::make_shared<pcl::visualization::PCLVisualizer>(
-          "PCD File - Point Cloud Visualization");
+        std::cout << "Downsampling with voxel grid\n";
 
-  std::cout << "Loading cloud information into structures.\n";
-  PointCloudVariantPtr pointCloudPtr = loadCloud(pointCloudBlob);
+        // Downsample with voxel grid
+        pcl::VoxelGrid<PointT> voxelGrid{};
+        pcl::PointCloud<PointT> out{};
 
-  runPMFAndVisualize(pointCloudPtr, cloudViewer);
+        voxelGrid.setInputCloud(cloudPtr);
 
-  cloudViewer->resetCamera();
+        voxelGrid.setLeafSize(5.0, 5.0, 5.0);
+        voxelGrid.filter(out);
 
-  std::cout << "Entering visualization loop\n";
+        std::cout << fmt::format(
+            "-- Voxel Grid filtered PointCloud data size: {}\n",
+            out.size());
 
-  // Start visualization loop
-  while (!cloudViewer->wasStopped()) {
-    cloudViewer->spinOnce(100);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-
-  return EXIT_SUCCESS;
+        return PointCloudVariantPtr{ pcl::make_shared<pcl::PointCloud<PointT>>(out) };
+      },
+      cloud);
 }
