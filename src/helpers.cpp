@@ -1,0 +1,82 @@
+#include "helpers.hpp"
+#include <fstream>
+#include <algorithm>
+
+namespace {
+static bool hasField(const pcl::PCLPointCloud2 &cloud, const std::string &field_name) {
+  return std::any_of(
+      cloud.fields.cbegin(), cloud.fields.cend(),
+      [&](const pcl::PCLPointField &f) { return f.name == field_name; });
+}
+} // namespace
+
+int loadPCDFileManual(const std::string &file_name,
+                      pcl::PCLPointCloud2 &pointCloud, Eigen::Vector4f &origin,
+                      Eigen::Quaternionf &orientation) {
+  pcl::PCDReader reader{};
+  int pcd_version{-1};
+  int data_type{-1};
+  unsigned data_index{0};
+
+  std::ifstream fstream{file_name, std::ios::binary};
+
+  if (!fstream.is_open()) {
+    std::cerr << fmt::format("Could not open pcd file: {}\n", file_name);
+    return -1;
+  }
+
+  int ret = reader.readHeader(fstream, pointCloud, origin, orientation,
+                              pcd_version, data_type, data_index);
+
+  if (ret < 0) {
+    std::cerr << fmt::format("Could not read pcd file: {}\n", file_name);
+    return -1;
+  }
+
+  if (data_type == 0) {
+
+    fstream.seekg(data_index);
+    return reader.readBodyASCII(fstream, pointCloud, pcd_version);
+
+  } else {
+
+    fstream.seekg(0, std::ios::end);
+    std::streampos file_size = fstream.tellg();
+    std::size_t body_size = static_cast<std::size_t>(file_size) - data_index;
+    fstream.seekg(0, std::ios::beg);
+
+    std::vector<unsigned char> buff(file_size);
+    fstream.read(reinterpret_cast<char *>(buff.data()), file_size);
+
+    if (!fstream) {
+      std::cerr << fmt::format("Error: read only {} bytes; expected {}.\n",
+                               fstream.gcount(),
+                               static_cast<std::size_t>(file_size));
+      return -1;
+    }
+
+    bool compressed{data_type == 2};
+
+    return reader.readBodyBinary(buff.data(), pointCloud, pcd_version,
+                                 compressed, data_index);
+  }
+}
+PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob) {
+  if (hasField(pointCloudBlob, "rgba")) {
+    auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZRGBA>>();
+    pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
+    return cloud;
+  } else if (hasField(pointCloudBlob, "rgb")) {
+    auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
+    pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
+    return cloud;
+  } else if (hasField(pointCloudBlob, "intensity")) {
+    auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZI>>();
+    pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
+    return cloud;
+  } else {
+    auto cloud = pcl::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+    pcl::fromPCLPointCloud2(pointCloudBlob, *cloud);
+    return cloud;
+  }
+}
