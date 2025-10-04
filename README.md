@@ -1,5 +1,7 @@
 # PCL Examples
 
+![Screenshot](https://raw.githubusercontent.com/squee72564/PCL_Examples/main/assets/screenshot-1759601643.png)
+
 This repository features some examples using the C++ [Point Cloud Library (PCL)](https://pointclouds.org/).
 
 ## Building
