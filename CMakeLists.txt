@@ -13,19 +13,19 @@ find_package(fmt CONFIG REQUIRED)
 find_package(PCL CONFIG REQUIRED)
 
 set(SOURCES
-    ${SRC_DIR}/main.cpp
     ${SRC_DIR}/helpers.cpp
 )
 
-add_executable(pcl_main
+add_executable(pcl_pmf_pipeline
+    ${SRC_DIR}/pcl_pmf_pipeline.cpp
     ${SOURCES}
 )
 
-target_link_libraries(pcl_main PRIVATE
+target_link_libraries(pcl_pmf_pipeline PRIVATE
     fmt::fmt-header-only
     ${PCL_LIBRARIES}
 )
 
-target_include_directories(pcl_main PRIVATE
+target_include_directories(pcl_pmf_pipeline PRIVATE
     ${INC_DIR}
 )
