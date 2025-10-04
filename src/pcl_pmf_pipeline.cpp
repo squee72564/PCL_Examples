@@ -4,6 +4,7 @@
 #include <pcl/impl/point_types.hpp>
 #include <thread>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 #include <fmt/format.h>
@@ -20,8 +21,8 @@
 #include <pcl/segmentation/progressive_morphological_filter.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
-void runPMFAndVisualize(const PointCloudVariantPtr &pointCloudPtr,
-                        const pcl::visualization::PCLVisualizer::Ptr &cloudViewer);
+[[nodiscard]] std::pair<PointCloudVariantPtr, PointCloudVariantPtr>
+extract_inlier_and_outlier_pmf(const PointCloudVariantPtr &inCloud);
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -53,9 +54,7 @@ int main(int argc, char *argv[]) {
           "PCD File - Point Cloud Visualization");
 
   // variant to hold all PointT types for actual point cloud
-  // Right now I load into a temporary cloud and then
   PointCloudVariantPtr pointCloudPtr{};
-
   {
     std::cout
         << "Converting PCLPointCloud2 to actual type PointCloud<PointT>\n";
@@ -65,7 +64,13 @@ int main(int argc, char *argv[]) {
     pointCloudPtr = std::move(downsampleWithVoxelGrid(pointCloudPtrTemp));
   }
 
-  runPMFAndVisualize(pointCloudPtr, cloudViewer);
+  auto &&[terrainCloud, obstacleCloud] =
+      extract_inlier_and_outlier_pmf(pointCloudPtr);
+
+  addToPointCloudVisualizer(terrainCloud, cloudViewer, "terrain",
+                            {0.0f, 1.0f, 0.0f});
+  addToPointCloudVisualizer(obstacleCloud, cloudViewer, "obstacles",
+                            {1.0f, 0.0f, 0.0f});
 
   std::cout << "Resetting camera\n";
   cloudViewer->resetCamera();
@@ -80,16 +85,15 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 
-void runPMFAndVisualize(const PointCloudVariantPtr &pointCloudPtr,
-                        const pcl::visualization::PCLVisualizer::Ptr &cloudViewer) {
-  std::visit(
+std::pair<PointCloudVariantPtr, PointCloudVariantPtr>
+extract_inlier_and_outlier_pmf(const PointCloudVariantPtr &inCloud) {
+  return std::visit(
       [&](auto &&cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
         using PointT = typename CloudT::PointType;
 
-        std::cout << "Running PMF and adding inlier / outlier point clouds to "
-                     "visualizer\n"
-                  << fmt::format("--Total points in cloud: {}\n",
+        std::cout << "Running PMF to extract inlier / outlier point clouds\n"
+                  << fmt::format("-- Total points in cloud: {}\n",
                                  cloudPtr->size());
 
         auto pmf =
@@ -112,21 +116,13 @@ void runPMFAndVisualize(const PointCloudVariantPtr &pointCloudPtr,
         extract.setNegative(true);
         extract.filter(*outlierCloud);
 
-        std::cout << "Got inliers and outliers\n";
+        std::cout << fmt::format("-- Total points in inlier cloud: {}\n",
+                                 inlierCloud->size())
+                  << fmt::format("-- Total points in outlier cloud: {}\n",
+                                 outlierCloud->size());
 
-        // Add point clouds to visualizer
-        addToPointCloudVisualizer<CloudT>(inlierCloud, cloudViewer, "inliers");
-
-        cloudViewer->setPointCloudRenderingProperties(
-            pcl::visualization::PCL_VISUALIZER_COLOR, 0, 1, 0, "inliers");
-
-        addToPointCloudVisualizer<CloudT>(outlierCloud, cloudViewer,
-                                          "outliers");
-
-        cloudViewer->setPointCloudRenderingProperties(
-            pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "outliers");
-
-        std::cout << "Added Point Clouds\n";
+        return std::make_pair(PointCloudVariantPtr{inlierCloud},
+                       PointCloudVariantPtr{outlierCloud});
       },
-      pointCloudPtr);
+      inCloud);
 }

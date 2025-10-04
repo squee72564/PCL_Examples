@@ -1,13 +1,15 @@
 #include "helpers.hpp"
-#include <fstream>
 #include <algorithm>
+#include <fstream>
 
 #include <pcl/common/centroid.h>
 #include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/visualization/common/common.h>
 
 namespace {
-static bool hasField(const pcl::PCLPointCloud2 &cloud, const std::string &field_name) {
+static bool hasField(const pcl::PCLPointCloud2 &cloud,
+                     const std::string &field_name) {
   return std::any_of(
       cloud.fields.cbegin(), cloud.fields.cend(),
       [&](const pcl::PCLPointField &f) { return f.name == field_name; });
@@ -93,17 +95,54 @@ PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob) {
 void shiftCloudToCentroid(PointCloudVariantPtr &cloud) {
   std::visit(
       [&](auto &&cloudPtr) {
-        if (!cloudPtr || cloudPtr->points.empty()) return;
+        if (!cloudPtr || cloudPtr->points.empty())
+          return;
 
         Eigen::Vector4f centroid{};
         pcl::compute3DCentroid(*cloudPtr, centroid);
 
-        Eigen::Affine3f transform{ Eigen::Affine3f::Identity() };
+        Eigen::Affine3f transform{Eigen::Affine3f::Identity()};
         transform.translation() = -centroid.head<3>();
 
         pcl::transformPointCloud(*cloudPtr, *cloudPtr, transform);
       },
       cloud);
+}
+
+void addToPointCloudVisualizer(
+    const PointCloudVariantPtr &pointCloud,
+    const pcl::visualization::PCLVisualizer::Ptr &cloudViewer,
+    const std::string &cloudName, const Eigen::Vector3f &cloudColor) {
+
+  std::visit(
+      [&](auto &&cloudPtr) {
+        using CloudT = std::decay_t<decltype(*cloudPtr)>;
+        using PointT = typename CloudT::PointType;
+        if constexpr (std::is_same_v<CloudT, pcl::PointCloud<pcl::PointXYZ>>) {
+          cloudViewer->addPointCloud(cloudPtr, cloudName);
+
+        } else if constexpr (std::is_same_v<CloudT,
+                                            pcl::PointCloud<pcl::PointXYZI>>) {
+          auto handler = pcl::visualization::PointCloudColorHandlerGenericField<
+              pcl::PointXYZI>(cloudPtr, "intensity");
+          cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
+
+        } else if constexpr (std::is_same_v<
+                                 CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
+                             std::is_same_v<
+                                 CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
+          auto handler = pcl::visualization::PointCloudColorHandlerRGBField<
+              typename CloudT::PointType>(cloudPtr);
+          cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
+        } else {
+          static_assert(always_false_v<CloudT>(), "Unsupported point type");
+        }
+
+        cloudViewer->setPointCloudRenderingProperties(
+            pcl::visualization::PCL_VISUALIZER_COLOR, cloudColor.x(),
+            cloudColor.y(), cloudColor.z(), cloudName);
+      },
+      pointCloud);
 }
 
 PointCloudVariantPtr
