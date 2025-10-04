@@ -21,8 +21,14 @@
 #include <pcl/segmentation/progressive_morphological_filter.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
+template <typename CloudT>
+void addToPointCloudVisualizer(
+    typename CloudT::Ptr &pointCloud,
+    pcl::visualization::PCLVisualizer::Ptr cloudViewer,
+    const std::string &cloudName);
+
 void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
-                        pcl::visualization::PCLVisualizer::Ptr cloudViewer);
+                        pcl::visualization::PCLVisualizer::Ptr& cloudViewer);
 
 void shiftCloudToLocalFrame(PointCloudVariantPtr &cloud);
 
@@ -62,7 +68,8 @@ int main(int argc, char *argv[]) {
   PointCloudVariantPtr pointCloudPtr{};
 
   {
-    std::cout << "Converting PCLPointCloud2 to actual type PointCloud<PointT>\n";
+    std::cout
+        << "Converting PCLPointCloud2 to actual type PointCloud<PointT>\n";
     PointCloudVariantPtr pointCloudPtrTemp = loadCloud(pointCloudBlob);
 
     shiftCloudToLocalFrame(pointCloudPtrTemp);
@@ -85,15 +92,16 @@ int main(int argc, char *argv[]) {
 }
 
 void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
-                        pcl::visualization::PCLVisualizer::Ptr cloudViewer) {
+                        pcl::visualization::PCLVisualizer::Ptr &cloudViewer) {
   std::visit(
-      [&](auto cloudPtr) {
+      [&](auto&& cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
         using PointT = typename CloudT::PointType;
 
-        std::cout
-            << "Running PMF and adding inlier / outlier point clouds to visualizer\n"
-            << fmt::format("--Total points in cloud: {}\n", cloudPtr->size());
+        std::cout << "Running PMF and adding inlier / outlier point clouds to "
+                     "visualizer\n"
+                  << fmt::format("--Total points in cloud: {}\n",
+                                 cloudPtr->size());
 
         auto pmf =
             pcl::make_shared<pcl::ProgressiveMorphologicalFilter<PointT>>();
@@ -117,54 +125,18 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
 
         std::cout << "Got inliers and outliers\n";
 
-        if constexpr (std::is_same_v<CloudT, pcl::PointCloud<pcl::PointXYZ>>) {
-          cloudViewer->addPointCloud(inlierCloud, "inliers");
-
-        } else if constexpr (std::is_same_v<CloudT,
-                                            pcl::PointCloud<pcl::PointXYZI>>) {
-          auto handler = pcl::visualization::PointCloudColorHandlerGenericField<
-              pcl::PointXYZI>(inlierCloud, "intensity");
-          cloudViewer->addPointCloud(inlierCloud, handler, "inliers");
-
-        } else if constexpr (std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
-                             std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
-          auto handler =
-              pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
-                  inlierCloud);
-          cloudViewer->addPointCloud(inlierCloud, handler, "inliers");
-        } else {
-          static_asserT(always_false_v<CloudT>(), "Unsupported point type");
-        }
-
         // Add point clouds to visualizer
+        addToPointCloudVisualizer<CloudT>(inlierCloud, cloudViewer, "inliers");
+
         cloudViewer->setPointCloudRenderingProperties(
             pcl::visualization::PCL_VISUALIZER_COLOR, 0, 1, 0, "inliers");
 
-        if constexpr (std::is_same_v<CloudT, pcl::PointCloud<pcl::PointXYZ>>) {
-          cloudViewer->addPointCloud(outlierCloud, "outliers");
 
-        } else if constexpr (std::is_same_v<CloudT,
-                                            pcl::PointCloud<pcl::PointXYZI>>) {
-          auto handler = pcl::visualization::PointCloudColorHandlerGenericField<
-              pcl::PointXYZI>(outlierCloud, "intensity");
-          cloudViewer->addPointCloud(outlierCloud, handler, "outliers");
-
-        } else if constexpr (std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
-                             std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
-          auto handler =
-              pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
-                  outlierCloud);
-          cloudViewer->addPointCloud(outlierCloud, handler, "outliers");
-        } else {
-          static_asserT(always_false_v<CloudT>(), "Unsupported point type");
-        }
+        addToPointCloudVisualizer<CloudT>(outlierCloud, cloudViewer, "outliers");
 
         cloudViewer->setPointCloudRenderingProperties(
             pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "outliers");
+
 
         std::cout << "Added Point Clouds\n";
       },
@@ -209,10 +181,10 @@ PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud) {
         voxelGrid.filter(out);
 
         std::cout << fmt::format(
-            "-- Voxel Grid filtered PointCloud data size: {}\n",
-            out.size());
+            "-- Voxel Grid filtered PointCloud data size: {}\n", out.size());
 
-        return PointCloudVariantPtr{ pcl::make_shared<pcl::PointCloud<PointT>>(out) };
+        return PointCloudVariantPtr{
+            pcl::make_shared<pcl::PointCloud<PointT>>(out)};
       },
       cloud);
 }
