@@ -4,6 +4,7 @@
 
 #include <pcl/common/centroid.h>
 #include <pcl/common/transforms.h>
+#include <pcl/filters/voxel_grid.h>
 
 namespace {
 static bool hasField(const pcl::PCLPointCloud2 &cloud, const std::string &field_name) {
@@ -103,4 +104,32 @@ void shiftCloudToCentroid(PointCloudVariantPtr &cloud) {
         pcl::transformPointCloud(*cloudPtr, *cloudPtr, transform);
       },
       cloud);
+}
+
+PointCloudVariantPtr
+downsampleWithVoxelGrid(const PointCloudVariantPtr &inCloud,
+                        const Eigen::Vector3f &leaf_sizes) {
+  return std::visit(
+      [&](auto &&cloudPtr) {
+        using CloudT = std::decay_t<decltype(*cloudPtr)>;
+        using PointT = typename CloudT::PointType;
+
+        std::cout << "Downsampling with voxel grid\n";
+
+        // Downsample with voxel grid
+        pcl::VoxelGrid<PointT> voxelGrid{};
+        pcl::PointCloud<PointT> out{};
+
+        voxelGrid.setInputCloud(cloudPtr);
+
+        voxelGrid.setLeafSize(leaf_sizes.x(), leaf_sizes.y(), leaf_sizes.z());
+        voxelGrid.filter(out);
+
+        std::cout << fmt::format(
+            "-- Voxel Grid filtered PointCloud data size: {}\n", out.size());
+
+        return PointCloudVariantPtr{
+            pcl::make_shared<pcl::PointCloud<PointT>>(out)};
+      },
+      inCloud);
 }

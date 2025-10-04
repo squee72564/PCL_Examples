@@ -14,17 +14,14 @@
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/common/common.h>
 #include <pcl/filters/extract_indices.h>
-#include <pcl/filters/voxel_grid.h>
 #include <pcl/memory.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/segmentation/progressive_morphological_filter.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
-void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
-                        pcl::visualization::PCLVisualizer::Ptr& cloudViewer);
-
-PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud);
+void runPMFAndVisualize(const PointCloudVariantPtr &pointCloudPtr,
+                        const pcl::visualization::PCLVisualizer::Ptr &cloudViewer);
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
@@ -83,10 +80,10 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 
-void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
-                        pcl::visualization::PCLVisualizer::Ptr &cloudViewer) {
+void runPMFAndVisualize(const PointCloudVariantPtr &pointCloudPtr,
+                        const pcl::visualization::PCLVisualizer::Ptr &cloudViewer) {
   std::visit(
-      [&](auto&& cloudPtr) {
+      [&](auto &&cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
         using PointT = typename CloudT::PointType;
 
@@ -123,40 +120,13 @@ void runPMFAndVisualize(PointCloudVariantPtr &pointCloudPtr,
         cloudViewer->setPointCloudRenderingProperties(
             pcl::visualization::PCL_VISUALIZER_COLOR, 0, 1, 0, "inliers");
 
-
-        addToPointCloudVisualizer<CloudT>(outlierCloud, cloudViewer, "outliers");
+        addToPointCloudVisualizer<CloudT>(outlierCloud, cloudViewer,
+                                          "outliers");
 
         cloudViewer->setPointCloudRenderingProperties(
             pcl::visualization::PCL_VISUALIZER_COLOR, 1, 0, 0, "outliers");
 
-
         std::cout << "Added Point Clouds\n";
       },
       pointCloudPtr);
-}
-
-PointCloudVariantPtr downsampleWithVoxelGrid(PointCloudVariantPtr &cloud) {
-  return std::visit(
-      [&](auto &&cloudPtr) {
-        using CloudT = std::decay_t<decltype(*cloudPtr)>;
-        using PointT = typename CloudT::PointType;
-
-        std::cout << "Downsampling with voxel grid\n";
-
-        // Downsample with voxel grid
-        pcl::VoxelGrid<PointT> voxelGrid{};
-        pcl::PointCloud<PointT> out{};
-
-        voxelGrid.setInputCloud(cloudPtr);
-
-        voxelGrid.setLeafSize(5.0, 5.0, 5.0);
-        voxelGrid.filter(out);
-
-        std::cout << fmt::format(
-            "-- Voxel Grid filtered PointCloud data size: {}\n", out.size());
-
-        return PointCloudVariantPtr{
-            pcl::make_shared<pcl::PointCloud<PointT>>(out)};
-      },
-      cloud);
 }

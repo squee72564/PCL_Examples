@@ -13,15 +13,18 @@
 template<class T>
 inline constexpr bool always_false_v = false;
 
-// Function to load a PCD file into PCLPointCloud2
+// Loads a PCD file into PCLPointCloud2
 int loadPCDFileManual(const std::string &file_name,
                       pcl::PCLPointCloud2 &pointCloud, Eigen::Vector4f &origin,
                       Eigen::Quaternionf &orientation);
 
+// Gets variant holding PointCloud<PointT> from PCLPointCloud2
 PointCloudVariantPtr loadCloud(const pcl::PCLPointCloud2 &pointCloudBlob);
 
+// Translates point cloud with centroid around origin
 void shiftCloudToCentroid(PointCloudVariantPtr &cloud);
 
+// Add a point cloud to the visualizer
 template <typename CloudT>
 void addToPointCloudVisualizer(
     typename CloudT::Ptr &pointCloud,
@@ -49,5 +52,10 @@ void addToPointCloudVisualizer(
     static_assert(always_false_v<CloudT>(), "Unsupported point type");
   }
 }
+
+// Downsample a pointcloud using a voxel grid
+PointCloudVariantPtr
+downsampleWithVoxelGrid(const PointCloudVariantPtr &cloud,
+                        const Eigen::Vector3f &leaf_sizes = {0.5f, 0.5f, 0.5f});
 
 #endif // HELPERS_HPP
