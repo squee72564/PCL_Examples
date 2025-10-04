@@ -1,0 +1,6 @@
+{
+    "dependencies": [
+        { "name": "pcl", "features": ["visualization"] },
+        "fmt"
+    ]
+}
