@@ -1,6 +1,8 @@
-#include "helpers.hpp"
 #include <algorithm>
 #include <fstream>
+
+#include "helper_types.hpp"
+#include "helpers.hpp"
 
 #include <pcl/common/centroid.h>
 #include <pcl/common/transforms.h>
@@ -8,12 +10,14 @@
 #include <pcl/visualization/common/common.h>
 
 namespace {
+
 static bool hasField(const pcl::PCLPointCloud2 &cloud,
                      const std::string &field_name) {
   return std::any_of(
       cloud.fields.cbegin(), cloud.fields.cend(),
       [&](const pcl::PCLPointField &f) { return f.name == field_name; });
 }
+
 } // namespace
 
 int loadPCDFileManual(const std::string &file_name,
@@ -114,6 +118,8 @@ void addToPointCloudVisualizer(
     const pcl::visualization::PCLVisualizer::Ptr &cloudViewer,
     const std::string &cloudName, const Eigen::Vector3f &cloudColor) {
 
+  namespace vis = pcl::visualization;
+
   std::visit(
       [&](auto &&cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
@@ -122,20 +128,16 @@ void addToPointCloudVisualizer(
           cloudViewer->addPointCloud(cloudPtr, cloudName);
 
         } else if constexpr (std::is_same_v<PointT, pcl::PointXYZI>) {
-          auto handler = pcl::visualization::PointCloudColorHandlerGenericField<
-              pcl::PointXYZI>(cloudPtr, "intensity");
+          auto handler{vis::PointCloudColorHandlerGenericField<pcl::PointXYZI>(
+              cloudPtr, "intensity")};
           cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
 
         } else if constexpr (std::is_same_v<PointT, pcl::PointXYZRGB>) {
-          auto handler =
-              pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
-                  cloudPtr);
+          auto handler{vis::PointCloudColorHandlerRGBField<PointT>(cloudPtr)};
           cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
 
         } else if constexpr (std::is_same_v<PointT, pcl::PointXYZRGBA>) {
-          auto handler =
-              pcl::visualization::PointCloudColorHandlerRGBAField<PointT>(
-                  cloudPtr);
+          auto handler{vis::PointCloudColorHandlerRGBAField<PointT>(cloudPtr)};
           cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
 
         } else {
@@ -143,8 +145,8 @@ void addToPointCloudVisualizer(
         }
 
         cloudViewer->setPointCloudRenderingProperties(
-            pcl::visualization::PCL_VISUALIZER_COLOR, cloudColor.x(),
-            cloudColor.y(), cloudColor.z(), cloudName);
+            vis::PCL_VISUALIZER_COLOR, cloudColor.x(), cloudColor.y(),
+            cloudColor.z(), cloudName);
       },
       pointCloud);
 }
