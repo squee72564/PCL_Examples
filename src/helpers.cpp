@@ -118,24 +118,28 @@ void addToPointCloudVisualizer(
       [&](auto &&cloudPtr) {
         using CloudT = std::decay_t<decltype(*cloudPtr)>;
         using PointT = typename CloudT::PointType;
-        if constexpr (std::is_same_v<CloudT, pcl::PointCloud<pcl::PointXYZ>>) {
+        if constexpr (std::is_same_v<PointT, pcl::PointXYZ>) {
           cloudViewer->addPointCloud(cloudPtr, cloudName);
 
-        } else if constexpr (std::is_same_v<CloudT,
-                                            pcl::PointCloud<pcl::PointXYZI>>) {
+        } else if constexpr (std::is_same_v<PointT, pcl::PointXYZI>) {
           auto handler = pcl::visualization::PointCloudColorHandlerGenericField<
               pcl::PointXYZI>(cloudPtr, "intensity");
           cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
 
-        } else if constexpr (std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGB>> ||
-                             std::is_same_v<
-                                 CloudT, pcl::PointCloud<pcl::PointXYZRGBA>>) {
-          auto handler = pcl::visualization::PointCloudColorHandlerRGBField<
-              typename CloudT::PointType>(cloudPtr);
+        } else if constexpr (std::is_same_v<PointT, pcl::PointXYZRGB>) {
+          auto handler =
+              pcl::visualization::PointCloudColorHandlerRGBField<PointT>(
+                  cloudPtr);
           cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
+
+        } else if constexpr (std::is_same_v<PointT, pcl::PointXYZRGBA>) {
+          auto handler =
+              pcl::visualization::PointCloudColorHandlerRGBAField<PointT>(
+                  cloudPtr);
+          cloudViewer->addPointCloud(cloudPtr, handler, cloudName);
+
         } else {
-          static_assert(always_false_v<CloudT>(), "Unsupported point type");
+          static_assert(always_false_v<PointT>(), "Unsupported PointT type");
         }
 
         cloudViewer->setPointCloudRenderingProperties(
