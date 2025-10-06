@@ -43,3 +43,20 @@ target_link_libraries(pcl_ransac_pipeline PRIVATE
 target_include_directories(pcl_ransac_pipeline PRIVATE
     ${INC_DIR}
 )
+
+add_executable(lidar_test
+    ${SRC_DIR}/LidarSimpleScene.cpp
+    ${SRC_DIR}/Ray.cpp
+    ${SRC_DIR}/Plane.cpp
+    ${SRC_DIR}/RectPlane.cpp
+    ${SRC_DIR}/Box.cpp
+)
+
+target_link_libraries(lidar_test PRIVATE
+    fmt::fmt-header-only
+    ${PCL_LIBRARIES}
+)
+
+target_include_directories(lidar_test PRIVATE
+    ${INC_DIR}
+)
