@@ -3,12 +3,10 @@
 #include <stdexcept>
 
 RectPlane::RectPlane(const V3f &origin_, const V3f &u_, const V3f &v_)
-    : origin{origin_}, u{u_}, v{v_}, normal{u_.cross(v_)} {
+    : origin{origin_}, u{u_}, v{v_}, normal{u_.cross(v_).normalized()} {
   if (u_.norm() < 1e-6f || v_.norm() < 1e-6f || normal.norm() < 1e-6f) {
     throw std::runtime_error("Degenerate RectPlane");
   }
-
-  normal = normal.normalized();
 }
 
 std::optional<HitRecord> RectPlane::intersect(const Ray &ray) const {
