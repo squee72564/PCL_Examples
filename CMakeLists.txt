@@ -29,3 +29,17 @@ target_link_libraries(pcl_pmf_pipeline PRIVATE
 target_include_directories(pcl_pmf_pipeline PRIVATE
     ${INC_DIR}
 )
+
+add_executable(pcl_ransac_pipeline
+    ${SRC_DIR}/pcl_ransac_pipeline.cpp
+    ${SOURCES}
+)
+
+target_link_libraries(pcl_ransac_pipeline PRIVATE
+    fmt::fmt-header-only
+    ${PCL_LIBRARIES}
+)
+
+target_include_directories(pcl_ransac_pipeline PRIVATE
+    ${INC_DIR}
+)
